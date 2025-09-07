@@ -1,0 +1,45 @@
+plugins {
+    id 'java'
+    id 'enterprises.iwakura.amber'
+    id "com.github.johnrengelman.shadow" version "8.1.1"
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+
+    amber 'com.google.code.gson:gson:2.13.1'
+    amber 'enterprises.iwakura:ganyu:1.0.0'
+}
+
+test {
+    useJUnitPlatform()
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_1_8
+    targetCompatibility = JavaVersion.VERSION_1_8
+}
+
+jar {
+    manifest {
+        attributes(
+                'Main-Class': 'enterprises.iwakura.amber.Main',
+                'Class-Path': 'lib/some-lib.jar'
+        )
+    }
+}
+
+tasks.withType(JavaCompile) {
+    options.release = 8
+}
+
+shadowJar {
+    destinationDirectory = file("../build/libs")
+}
+
+amber {
+    libraryDir = "my-lib"
+}

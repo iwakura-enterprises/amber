@@ -1,0 +1,102 @@
+plugins {
+    id 'java'
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+
+}
+
+test {
+    useJUnitPlatform()
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_1_8
+    targetCompatibility = JavaVersion.VERSION_1_8
+}
+
+tasks.withType(JavaCompile) {
+    options.release = 8
+}
+
+// == Maven publishing == //
+
+medivhPublisher {
+    groupId = project.group.toString()
+    artifactId = project.name
+    version = project.version.toString()
+    pom {
+        name = "Amber Core"
+        description = "Amber the Bootstrapper"
+        url = "https://github.com/iwakura-enterprises/amber"
+        licenses {
+            license {
+                name = "The MIT License"
+                url = "https://opensource.org/license/mit"
+            }
+        }
+        developers {
+            developer {
+                id = "mayuna"
+                name = "Marek Lof"
+                email = "uwulilmayu@gmail.com"
+            }
+        }
+        scm {
+            connection = "scm:git:"
+            url = "https://github.com/iwakura-enterprises/amber.git"
+        }
+    }
+}
+
+components.java.withVariantsFromConfiguration(configurations.shadowRuntimeElements) {
+    skip()
+}
+
+shadowJar.dependsOn javadocJar
+shadowJar.dependsOn sourcesJar
+shadowJar.dependsOn jar
+
+def generatedSrcDir = "${buildDir}/generated-src/main/java"
+
+task generateVersionClass {
+    doLast {
+        def versionClassFile = file("${generatedSrcDir}/enterprises/iwakura/amber/Version.java")
+        versionClassFile.parentFile.mkdirs()
+        versionClassFile.text =
+"""
+package enterprises.iwakura.amber;
+
+/**
+ * Auto-generated version class.
+ */
+public final class Version {
+
+    /**
+     * Project's current version.
+     */
+    public static final String VERSION = "${project.version}";
+
+    private Version() {
+        // Prevent instantiation
+    }
+}
+"""
+    }
+}
+
+// Include generated sources in compilation
+sourceSets {
+    main {
+        java {
+            srcDir generatedSrcDir
+        }
+    }
+}
+
+// Make sure version class is generated before compilation
+compileJava.dependsOn generateVersionClass

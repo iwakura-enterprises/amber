@@ -1,0 +1,42 @@
+plugins {
+    id 'groovy'
+    id 'java-gradle-plugin'
+    id 'com.gradle.plugin-publish' version '1.3.0'
+}
+
+group = 'enterprises.iwakura'
+version = '1.0.0'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation gradleApi()
+    implementation localGroovy()
+
+    testImplementation platform('org.junit:junit-bom:5.10.0')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+}
+
+test {
+    useJUnitPlatform()
+}
+
+// == Gradle publishing == //
+
+gradlePlugin {
+    website = "https://iwakura.enterprises"
+    vcsUrl = "https://github.com/iwakura-enterprises/amber.git"
+    plugins {
+        create("amber-plugin") {
+            id = "enterprises.iwakura.amber"
+            implementationClass = "enterprises.iwakura.amber.Amber"
+            group = project.group.toString()
+            version = project.version.toString()
+            displayName = "Amber plugin"
+            description = "This plugin allows you to quickly specify dependencies for Amber to download and load on your application's startup."
+            tags.set(['bootstrapper', 'java', 'generate', 'dependencies'])
+        }
+    }
+}
