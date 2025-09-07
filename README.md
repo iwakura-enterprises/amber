@@ -4,8 +4,8 @@
 
 # Amber
 
-Java library and Gradle plugin for managing and downloading dependencies from repositories runtime. This
-allows you to lower your jar's size by offloading dependencies to be downloaded at runtime.
+Java library and Gradle plugin for managing and downloading dependencies from repositories during runtime. This
+allows you to lower your jar's size by offloading dependencies to be downloaded by Amber when your application starts.
 
 > Disclaimer: The library name and design is not related to any character in any game or media.
 
