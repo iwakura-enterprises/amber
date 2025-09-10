@@ -34,7 +34,7 @@ plugins {
 
 dependencies {
   // Add Amber as a dependency
-  implementation 'enterprises.iwakura:amber-core:1.0.0'
+  implementation 'enterprises.iwakura:amber-core:1.0.1'
 
   // Declare dependencies with amber
   amber 'enterprises.iwakura:sigewine-core:2.2.1'
