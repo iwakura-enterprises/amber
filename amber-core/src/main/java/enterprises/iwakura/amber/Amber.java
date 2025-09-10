@@ -47,6 +47,11 @@ public class Amber {
     protected final Logger logger;
 
     /**
+     * Indicates whether any dependencies were downloaded during the bootstrapping process.
+     */
+    protected boolean downloadedSomething = false;
+
+    /**
      * Create an Amber instance that loads manifests from the current thread's context class loader. Uses {@link ConsoleLogger} with debug messages
      * disabled.
      *
@@ -146,11 +151,14 @@ public class Amber {
 
         logger.info(String.format("Bootstrapping completed (took %d ms)", TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startTime)));
 
-        if (options.getExitCodeAfterDownload() != null) {
+        if (downloadedSomething && options.getExitCodeAfterDownload() != null) {
             logger.info("Exiting with code " + options.getExitCodeAfterDownload() + " as per configuration.");
             System.exit(options.getExitCodeAfterDownload());
             return null;
         }
+
+        // Reset for potential re-use
+        downloadedSomething = false;
 
         return allDependencies;
     }
@@ -272,6 +280,7 @@ public class Amber {
             Files.move(tempJarPath, jarPath, StandardCopyOption.REPLACE_EXISTING);
             logger.info(String.format("Downloaded dependency %s to %s (took %d ms)", dependency, jarPath, TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startTime)));
             dependencyPaths.add(jarPath);
+            downloadedSomething = true;
         }
 
         return dependencyPaths;
