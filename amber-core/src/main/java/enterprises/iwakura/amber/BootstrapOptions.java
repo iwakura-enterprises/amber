@@ -61,10 +61,23 @@ public class BootstrapOptions {
     private Integer exitCodeAfterDownload;
 
     /**
+     * An optional message to print to the console before exiting after downloading dependencies. If null, no message will be printed.
+     * {@link #exitCodeAfterDownload} must be set for this to have any effect.
+     */
+    private String exitMessageAfterDownload;
+
+    /**
      * An optional override for the library directory specified in the manifest. If set, this directory will be used instead of the one in the
      * manifest.
      */
     private Path libraryDirectoryOverride;
+
+    /**
+     * The number of threads to use for downloading dependencies. Defaults to twice the number of available processors. A higher number may
+     * speed up the bootstrapping process significantly, especially when downloading many small dependencies.
+     */
+    @Builder.Default
+    private int downloaderThreadCount = Runtime.getRuntime().availableProcessors() * 2;
 
     /**
      * Get the preferred library directory, using the override if set, otherwise falling back to the manifest's directory.

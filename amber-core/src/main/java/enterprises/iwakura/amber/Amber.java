@@ -13,7 +13,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * The entrypoint for Amber's bootstrapping functionality.
@@ -153,6 +156,9 @@ public class Amber {
 
         if (downloadedSomething && options.getExitCodeAfterDownload() != null) {
             logger.info("Exiting with code " + options.getExitCodeAfterDownload() + " as per configuration.");
+            if (options.getExitMessageAfterDownload() != null) {
+                logger.info(options.getExitMessageAfterDownload());
+            }
             System.exit(options.getExitCodeAfterDownload());
             return null;
         }
@@ -175,6 +181,8 @@ public class Amber {
      */
     protected List<Path> processManifest(AmberManifest manifest, BootstrapOptions options) throws IOException {
         List<Path> dependencyPaths = new ArrayList<>();
+        ExecutorService executorService = Executors.newFixedThreadPool(options.getDownloaderThreadCount());
+        AtomicReference<Exception> lastException = new AtomicReference<>();
 
         logger.info(String.format("Bootstrapping %d dependencies from %d repositories into %s",
                 manifest.getDependencies().size(),
@@ -183,104 +191,129 @@ public class Amber {
         ));
 
         for (Dependency dependency : manifest.getDependencies()) {
-            long startTime = System.nanoTime();
-
-            if (isDependencyDownloaded(dependency, manifest, options)) {
-                logger.debug("Dependency exists: " + dependency);
-                dependencyPaths.add(options.getPrefferedLibraryDirectory(manifest).resolve(dependency.getFileName()));
-                continue;
-            }
-
-            Path libraryDir = options.getPrefferedLibraryDirectory(manifest);
-            Path tempJarPath = options.getTempDirectory().resolve(dependency.getFileName() + UUID.randomUUID() + ".part");
-            Path jarPath = libraryDir.resolve(dependency.getFileName());
-            Files.createDirectories(jarPath.getParent());
-            Files.createDirectories(tempJarPath.getParent());
-
-            Map<Repository, DownloadResult> dependencyDownloadResults = new HashMap<>();
-            StringDownloadResult checksumDownloadResult = null;
-            ChecksumResult checksumResult = ChecksumResult.NOT_FOUND;
-
-            logger.debug(String.format("Downloading dependency %s from %d repositories...", dependency, manifest.getRepositories().size()));
-
-            repository_loop:
-            for (Repository repository : manifest.getRepositories()) {
-                DependencyDownloader downloader = downloaders.get(repository.getType());
-
-                if (downloader == null) {
-                    logger.error("No downloader found for repository type: " + repository.getType(), null);
-                    continue;
+            executorService.execute(() -> {
+                if (lastException.get() != null) {
+                    logger.debug("Skipping download of " + dependency + " due to previous error.");
+                    return; // Skip further processing if an exception has already occurred
                 }
 
-                logger.debug(String.format("Attempting to download %s from %s (may not specify the exact version)", dependency, repository.getJarDownloadPath(dependency, null)));
-                DownloadResult result = downloader.downloadJar(dependency, repository, tempJarPath);
-                dependencyDownloadResults.put(repository, result);
+                try {
+                    long startTime = System.nanoTime();
 
-                if (!result.isSuccess()) {
-                    logger.debug("Download failed: " + result.getErrorMessage());
-                    continue;
-                }
+                    if (isDependencyDownloaded(dependency, manifest, options)) {
+                        logger.debug("Dependency exists: " + dependency);
+                        dependencyPaths.add(options.getPrefferedLibraryDirectory(manifest).resolve(dependency.getFileName()));
+                        return;
+                    }
 
-                if (options.isValidateChecksums()) {
-                    logger.debug("Validating checksums for " + dependency);
-                    for (ChecksumType checksumType : ChecksumType.values()) {
-                        StringDownloadResult tempResult = downloader.downloadChecksum(dependency, repository, checksumType);
+                    Path libraryDir = options.getPrefferedLibraryDirectory(manifest);
+                    Path tempJarPath = options.getTempDirectory().resolve(dependency.getFileName() + UUID.randomUUID() + ".part");
+                    Path jarPath = libraryDir.resolve(dependency.getFileName());
+                    Files.createDirectories(jarPath.getParent());
+                    Files.createDirectories(tempJarPath.getParent());
 
-                        if (tempResult.isSuccess()) {
-                            checksumResult = checksumValidator.validate(checksumType, tempResult.getContent(), tempJarPath);
-                            logger.debug("Checksum " + checksumType + " validation result: " + checksumResult);
+                    Map<Repository, DownloadResult> dependencyDownloadResults = new HashMap<>();
+                    StringDownloadResult checksumDownloadResult = null;
+                    ChecksumResult checksumResult = ChecksumResult.NOT_FOUND;
 
-                            if (checksumResult == ChecksumResult.UNSUPPORTED) {
-                                logger.error("Unsupported algorithm for checksum type: " + checksumType, null);
-                                // Continue on unsupported checksum type
-                            } else {
-                                checksumDownloadResult = tempResult;
-                                break repository_loop; // Break on first (in)valid checksum that is supported
+                    logger.debug(String.format("Downloading dependency %s from %d repositories...", dependency, manifest.getRepositories().size()));
+
+                    repository_loop:
+                    for (Repository repository : manifest.getRepositories()) {
+                        DependencyDownloader downloader = downloaders.get(repository.getType());
+
+                        if (downloader == null) {
+                            logger.error("No downloader found for repository type: " + repository.getType(), null);
+                            continue;
+                        }
+
+                        logger.debug(String.format("Attempting to download %s from %s (may not specify the exact version)", dependency, repository.getJarDownloadPath(dependency, null)));
+                        DownloadResult result = downloader.downloadJar(dependency, repository, tempJarPath);
+                        dependencyDownloadResults.put(repository, result);
+
+                        if (!result.isSuccess()) {
+                            logger.debug("Download failed: " + result.getErrorMessage());
+                            continue;
+                        }
+
+                        if (options.isValidateChecksums()) {
+                            logger.debug("Validating checksums for " + dependency);
+                            for (ChecksumType checksumType : ChecksumType.values()) {
+                                StringDownloadResult tempResult = downloader.downloadChecksum(dependency, repository, checksumType);
+
+                                if (tempResult.isSuccess()) {
+                                    checksumResult = checksumValidator.validate(checksumType, tempResult.getContent(), tempJarPath);
+                                    logger.debug("Checksum " + checksumType + " validation result: " + checksumResult);
+
+                                    if (checksumResult == ChecksumResult.UNSUPPORTED) {
+                                        logger.error("Unsupported algorithm for checksum type: " + checksumType, null);
+                                        // Continue on unsupported checksum type
+                                    } else {
+                                        checksumDownloadResult = tempResult;
+                                        break repository_loop; // Break on first (in)valid checksum that is supported
+                                    }
+                                } else {
+                                    logger.debug("Checksum download failed for type " + checksumType + ": " + tempResult.getErrorMessage());
+                                    // Assign the last error if no checksum was found yet
+                                    checksumDownloadResult = tempResult;
+                                }
                             }
                         } else {
-                            logger.debug("Checksum download failed for type " + checksumType + ": " + tempResult.getErrorMessage());
-                            // Assign the last error if no checksum was found yet
-                            checksumDownloadResult = tempResult;
+                            logger.debug("Skipping checksum validation for " + dependency + " as per configuration.");
+                            checksumResult = ChecksumResult.MATCH; // Skip checksum validation
                         }
                     }
-                } else {
-                    logger.debug("Skipping checksum validation for " + dependency + " as per configuration.");
-                    checksumResult = ChecksumResult.MATCH; // Skip checksum validation
+
+                    if (dependencyDownloadResults.values().stream().noneMatch(DownloadResult::isSuccess)) {
+                        logger.error(String.format("Could not find %s in repositories: ", dependency), null);
+                        manifest.getRepositories().forEach(repository -> {
+                            String errorMessage = Optional.ofNullable(dependencyDownloadResults.get(repository))
+                                    .map(DownloadResult::getErrorMessage)
+                                    .orElse("N/A");
+                            logger.error(String.format(" - %s: %s", repository.getUrl(), errorMessage), null);
+                        });
+
+                        if (options.isFailOnMissingDependency()) {
+                            throw new IOException("Failed to download dependency: " + dependency);
+                        }
+                    }
+
+                    if (checksumResult != ChecksumResult.MATCH) {
+                        if (checksumDownloadResult != null) {
+                            logger.error(String.format("Checksum validation failed for %s: %s with error %s", dependency, checksumResult, checksumDownloadResult.getErrorMessage()), null);
+                        } else {
+                            logger.error(String.format("Checksum validation failed for %s: %s", dependency, checksumResult), null);
+                        }
+
+                        if (options.isFailOnInvalidChecksum()) {
+                            throw new IOException("Invalid checksum for dependency: " + dependency);
+                        }
+                    }
+
+                    // Move temp file to library directory
+                    logger.debug(String.format("Moving downloaded dependency at %s to %s", tempJarPath, jarPath));
+                    Files.move(tempJarPath, jarPath, StandardCopyOption.REPLACE_EXISTING);
+                    logger.info(String.format("Downloaded dependency %s to %s (took %d ms)", dependency, jarPath, TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startTime)));
+                    dependencyPaths.add(jarPath);
+                    downloadedSomething = true;
+                } catch (Exception exception) {
+                    lastException.set(exception);
                 }
+            });
+        }
+
+        executorService.shutdown();
+        try {
+            if (!executorService.awaitTermination(1, TimeUnit.DAYS)) {
+                executorService.shutdownNow();
             }
+        } catch (InterruptedException exception) {
+            executorService.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
 
-            if (dependencyDownloadResults.values().stream().noneMatch(DownloadResult::isSuccess)) {
-                logger.error(String.format("Could not find %s in repositories: ", dependency), null);
-                manifest.getRepositories().forEach(repository -> {
-                    String errorMessage = Optional.ofNullable(dependencyDownloadResults.get(repository))
-                            .map(DownloadResult::getErrorMessage)
-                            .orElse("N/A");
-                    logger.error(String.format(" - %s: %s", repository.getUrl(), errorMessage), null);
-                });
-
-                if (options.isFailOnMissingDependency()) {
-                    throw new IOException("Failed to download dependency: " + dependency);
-                }
-            }
-
-            if (checksumResult != ChecksumResult.MATCH) {
-                if (checksumDownloadResult != null) {
-                    logger.error(String.format("Checksum validation failed for %s: %s with error %s", dependency, checksumResult, checksumDownloadResult.getErrorMessage()), null);
-                } else {
-                    logger.error(String.format("Checksum validation failed for %s: %s", dependency, checksumResult), null);
-                }
-
-                if (options.isFailOnInvalidChecksum()) {
-                    throw new IOException("Invalid checksum for dependency: " + dependency);
-                }
-            }
-
-            // Move temp file to library directory
-            logger.debug(String.format("Moving downloaded dependency at %s to %s", tempJarPath, jarPath));
-            Files.move(tempJarPath, jarPath, StandardCopyOption.REPLACE_EXISTING);
-            logger.info(String.format("Downloaded dependency %s to %s (took %d ms)", dependency, jarPath, TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startTime)));
-            dependencyPaths.add(jarPath);
-            downloadedSomething = true;
+        if (lastException.get() != null) {
+            throw new IOException("An error occurred during bootstrapping.", lastException.get());
         }
 
         return dependencyPaths;
