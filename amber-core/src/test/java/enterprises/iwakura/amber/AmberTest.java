@@ -1,7 +1,6 @@
 package enterprises.iwakura.amber;
 
 import enterprises.iwakura.amber.impl.*;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -84,7 +83,7 @@ public class AmberTest {
                 .forceRedownload(false)
                 .failOnMissingDependency(true)
                 .libraryDirectoryOverride(null)
-                .progressHintConsumer(hints::add)
+                .progressHintCallback(hints::add)
                 .build()
         );
 

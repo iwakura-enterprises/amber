@@ -79,12 +79,12 @@ public class BootstrapOptions {
     private Function<List<Path>, Integer> exitCallback;
 
     /**
-     * An optional consumer that will receive progress hints during the bootstrap process.
-     * This includes updates for existing and currently downloading dependencies. Be aware that this consumer may be invoked from multiple threads
-     * (see {@link #downloaderThreadCount} for more information). Any exceptions thrown by this consumer will be caught and logged,
+     * An optional callback that will receive progress hints during the bootstrap process.
+     * This includes updates for existing and currently downloading dependencies. Be aware that this callback may be invoked from multiple threads
+     * (see {@link #downloaderThreadCount} for more information). Any exceptions thrown by this callback will be caught and logged,
      * but will <b>not</b> affect the bootstrap process.
      */
-    private Consumer<ProgressHintContext> progressHintConsumer;
+    private Consumer<ProgressHintContext> progressHintCallback;
 
     /**
      * An optional override for the library directory specified in the manifest. If set, this directory will be used instead of the one in the
@@ -111,16 +111,16 @@ public class BootstrapOptions {
     }
 
     /**
-     * Invokes the progress hint consumer with the given context, if it is set.
+     * Invokes the progress hint callback with the given context, if it is set.
      *
-     * @param context The progress hint context to pass to the consumer.
+     * @param context The progress hint context to pass to the callback.
      */
-    public void invokeProgressHintConsumer(ProgressHintContext context, Logger logger) {
-        if (progressHintConsumer != null) {
+    public void invokeProgressHintCallback(ProgressHintContext context, Logger logger) {
+        if (progressHintCallback != null) {
             try {
-                progressHintConsumer.accept(context);
+                progressHintCallback.accept(context);
             } catch (Exception exception) {
-                logger.error("An exception occurred while invoking the progress hint consumer!", exception);
+                logger.error("An exception occurred while invoking the progress hint callback!", exception);
             }
         }
     }

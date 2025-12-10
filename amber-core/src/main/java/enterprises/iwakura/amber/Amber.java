@@ -215,7 +215,7 @@ public class Amber {
                     if (isDependencyDownloaded(dependency, manifest, options)) {
                         logger.debug("Dependency exists: " + dependency);
                         dependencyPaths.add(options.getPrefferedLibraryDirectory(manifest).resolve(dependency.getFileName()));
-                        options.invokeProgressHintConsumer(new ProgressHintContext(dependency, manifest, ProgressHintContext.Type.EXISTING), logger);
+                        options.invokeProgressHintCallback(new ProgressHintContext(dependency, manifest, ProgressHintContext.Type.EXISTING), logger);
                         return;
                     }
 
@@ -230,7 +230,7 @@ public class Amber {
                     ChecksumResult checksumResult = ChecksumResult.NOT_FOUND;
 
                     logger.debug(String.format("Downloading dependency %s from %d repositories...", dependency, manifest.getRepositories().size()));
-                    options.invokeProgressHintConsumer(new ProgressHintContext(dependency, manifest, ProgressHintContext.Type.START_DOWNLOAD), logger);
+                    options.invokeProgressHintCallback(new ProgressHintContext(dependency, manifest, ProgressHintContext.Type.START_DOWNLOAD), logger);
 
                     repository_loop:
                     for (Repository repository : manifest.getRepositories()) {
@@ -310,7 +310,7 @@ public class Amber {
                     logger.info(String.format("Downloaded dependency %s to %s (took %d ms)", dependency, jarPath, TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startTime)));
                     dependencyPaths.add(jarPath);
                     downloadedSomething = true;
-                    options.invokeProgressHintConsumer(new ProgressHintContext(dependency, manifest, ProgressHintContext.Type.FINISH_DOWNLOAD), logger);
+                    options.invokeProgressHintCallback(new ProgressHintContext(dependency, manifest, ProgressHintContext.Type.FINISH_DOWNLOAD), logger);
                 } catch (Exception exception) {
                     logger.error("Error processing dependency " + dependency, exception);
                     lastException.set(exception);
