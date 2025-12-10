@@ -5,6 +5,9 @@ import lombok.Data;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.List;
+import java.util.function.Consumer;
+import java.util.function.Function;
 
 /**
  * Options for Amber's bootstrap process. Holds various settings that control how dependencies are downloaded and validated.
@@ -67,6 +70,23 @@ public class BootstrapOptions {
     private String exitMessageAfterDownload;
 
     /**
+     * An optional exit callback function that will be called with the list of all dependency paths before exiting (this includes even
+     * those that were downloaded in the past bootstraps. The supplied list is the same one as the one returned by the {@link Amber#bootstrap()}
+     * methods). If set, {@link #exitCodeAfterDownload} and {@link #exitMessageAfterDownload} will be
+     * ignored. A non-null return value from this function will be used as the exit code. If the return value will be null, the application will
+     * <b>not</b> exit. This function will not be invoked if no dependencies were downloaded.
+     */
+    private Function<List<Path>, Integer> exitCallback;
+
+    /**
+     * An optional consumer that will receive progress hints during the bootstrap process.
+     * This includes updates for existing and currently downloading dependencies. Be aware that this consumer may be invoked from multiple threads
+     * (see {@link #downloaderThreadCount} for more information). Any exceptions thrown by this consumer will be caught and logged,
+     * but will <b>not</b> affect the bootstrap process.
+     */
+    private Consumer<ProgressHintContext> progressHintConsumer;
+
+    /**
      * An optional override for the library directory specified in the manifest. If set, this directory will be used instead of the one in the
      * manifest.
      */
@@ -88,5 +108,20 @@ public class BootstrapOptions {
      */
     public Path getPrefferedLibraryDirectory(AmberManifest manifest) {
         return libraryDirectoryOverride != null ? libraryDirectoryOverride : manifest.getDirectory();
+    }
+
+    /**
+     * Invokes the progress hint consumer with the given context, if it is set.
+     *
+     * @param context The progress hint context to pass to the consumer.
+     */
+    public void invokeProgressHintConsumer(ProgressHintContext context, Logger logger) {
+        if (progressHintConsumer != null) {
+            try {
+                progressHintConsumer.accept(context);
+            } catch (Exception exception) {
+                logger.error("An exception occurred while invoking the progress hint consumer!", exception);
+            }
+        }
     }
 }

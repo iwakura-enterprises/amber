@@ -14,7 +14,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.*;
 
 public class AmberTest {
 
@@ -24,6 +24,7 @@ public class AmberTest {
     @Test
     public void testDownload() throws IOException {
         // Arrange
+        List<ProgressHintContext> hints = new ArrayList<>();
         List<Path> testFiles = new ArrayList<>();
         testFiles.add(Paths.get("../test-file/leyline-1.0-SNAPSHOT-all.jar"));
 
@@ -83,6 +84,7 @@ public class AmberTest {
                 .forceRedownload(false)
                 .failOnMissingDependency(true)
                 .libraryDirectoryOverride(null)
+                .progressHintConsumer(hints::add)
                 .build()
         );
 
@@ -95,6 +97,9 @@ public class AmberTest {
 
         // Some files in manifest3
         assertEquals(19, Files.list(manifest3Directory).count());
+
+        // There were progress hints
+        assertFalse(hints.isEmpty());
     }
 
     private void addDependencies(AmberManifest manifest, String... dependencies) {

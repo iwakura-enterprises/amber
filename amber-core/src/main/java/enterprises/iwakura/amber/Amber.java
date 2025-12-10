@@ -154,13 +154,25 @@ public class Amber {
 
         logger.info(String.format("Bootstrapping completed (took %d ms)", TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startTime)));
 
-        if (downloadedSomething && options.getExitCodeAfterDownload() != null) {
-            logger.info("Exiting with code " + options.getExitCodeAfterDownload() + " as per configuration.");
-            if (options.getExitMessageAfterDownload() != null) {
-                logger.info(options.getExitMessageAfterDownload());
+        // Check if something was downloaded; if so, handle exit conditions
+        if (downloadedSomething) {
+            Integer exitCode = null;
+            if (options.getExitCallback() != null) {
+                exitCode = options.getExitCallback().apply(allDependencies);
+            } else if (options.getExitCodeAfterDownload() != null) {
+                logger.info(String.format("Exiting with code %d as per configuration.", options.getExitCodeAfterDownload()));
+
+                if (options.getExitMessageAfterDownload() != null) {
+                    logger.info(options.getExitMessageAfterDownload());
+                }
+
+                exitCode = options.getExitCodeAfterDownload();
             }
-            System.exit(options.getExitCodeAfterDownload());
-            return null;
+
+            if (exitCode != null) {
+                System.exit(exitCode);
+                return null;
+            }
         }
 
         // Reset for potential re-use
@@ -203,6 +215,7 @@ public class Amber {
                     if (isDependencyDownloaded(dependency, manifest, options)) {
                         logger.debug("Dependency exists: " + dependency);
                         dependencyPaths.add(options.getPrefferedLibraryDirectory(manifest).resolve(dependency.getFileName()));
+                        options.invokeProgressHintConsumer(new ProgressHintContext(dependency, manifest, ProgressHintContext.Type.EXISTING), logger);
                         return;
                     }
 
@@ -217,6 +230,7 @@ public class Amber {
                     ChecksumResult checksumResult = ChecksumResult.NOT_FOUND;
 
                     logger.debug(String.format("Downloading dependency %s from %d repositories...", dependency, manifest.getRepositories().size()));
+                    options.invokeProgressHintConsumer(new ProgressHintContext(dependency, manifest, ProgressHintContext.Type.START_DOWNLOAD), logger);
 
                     repository_loop:
                     for (Repository repository : manifest.getRepositories()) {
@@ -296,7 +310,9 @@ public class Amber {
                     logger.info(String.format("Downloaded dependency %s to %s (took %d ms)", dependency, jarPath, TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startTime)));
                     dependencyPaths.add(jarPath);
                     downloadedSomething = true;
+                    options.invokeProgressHintConsumer(new ProgressHintContext(dependency, manifest, ProgressHintContext.Type.FINISH_DOWNLOAD), logger);
                 } catch (Exception exception) {
+                    logger.error("Error processing dependency " + dependency, exception);
                     lastException.set(exception);
                 }
             });
