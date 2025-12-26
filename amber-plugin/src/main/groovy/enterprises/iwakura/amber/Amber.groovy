@@ -153,8 +153,9 @@ class Amber implements Plugin<Project> {
         // Inside the apply(Project project) method in Amber.groovy
         def amberConfiguration = project.configurations.create('amber')
 
-        // Make sure the configuration is included in the compilation classpath
+        // Make sure the configuration is included in the compilation & runtime classpath
         project.configurations.compileClasspath.extendsFrom amberConfiguration
+        project.configurations.runtimeClasspath.extendsFrom amberConfiguration
 
         // Dependency handler for 'amber' configuration
         project.ext.amber = { dependencyNotation ->
@@ -165,6 +166,13 @@ class Amber implements Plugin<Project> {
         project.afterEvaluate {
             // For all Jar tasks...
             project.tasks.withType(Jar) { jarTask ->
+                def jarTaskName = jarTask.name
+
+                if (jarTaskName == 'sourcesJar' || jarTaskName == 'javadocJar') {
+                    // Skip sources and javadoc jars
+                    return
+                }
+
                 // ...create a dedicated task for adding amber manifest attributes
                 def manifestTaskName = "generate${jarTask.name.capitalize()}AmberManifest"
                 def manifestTask = project.tasks.create(manifestTaskName, AmberManifestTask) {
