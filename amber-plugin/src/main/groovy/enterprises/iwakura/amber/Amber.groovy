@@ -153,9 +153,8 @@ class Amber implements Plugin<Project> {
         // Inside the apply(Project project) method in Amber.groovy
         def amberConfiguration = project.configurations.create('amber')
 
-        // Make sure the configuration is included in the compilation & runtime classpath
+        // Make sure the configuration is included in the compilation classpath
         project.configurations.compileClasspath.extendsFrom amberConfiguration
-        project.configurations.runtimeClasspath.extendsFrom amberConfiguration
 
         // Dependency handler for 'amber' configuration
         project.ext.amber = { dependencyNotation ->
