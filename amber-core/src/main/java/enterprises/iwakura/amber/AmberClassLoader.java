@@ -61,12 +61,11 @@ public class AmberClassLoader extends URLClassLoader {
                     // regardless if they are from dependencies or not.
                     clazz = findClass(name);
                 } catch (ClassNotFoundException e) {
-                    try {
+                    ClassLoader parent = getParent();
+                    if (parent != null) {
+                        clazz = parent.loadClass(name);
+                    } else {
                         clazz = getSystemClassLoader().loadClass(name);
-                    } catch (ClassNotFoundException e2) {
-                        throw new ClassNotFoundException(
-                                "Class not found in libraries or system: " + name, e
-                        );
                     }
                 }
             }
