@@ -114,14 +114,17 @@ public class Amber {
     /**
      * Create an AmberClassLoader with the specified dependencies. Uses current thread's class loader to specify
      * parent class loader and <code>Amber.class</code> as caller. If class of Amber supplied by the current class loader,
-     * consider using {@link AmberClassLoader#AmberClassLoader(List, ClassLoader, Class)} directly.
+     * consider using {@link AmberClassLoader#AmberClassLoader(List, ClassLoader, Class)} directly. After creating,
+     * sets the created class loader as the current thread's context class loader.
      *
      * @param dependencies The list of dependency paths to include in the class loader.
      *
      * @return An AmberClassLoader instance.
      */
     public static AmberClassLoader createClassLoader(List<Path> dependencies) {
-        return new AmberClassLoader(dependencies, Thread.currentThread().getContextClassLoader(), Amber.class);
+        AmberClassLoader classLoader = new AmberClassLoader(dependencies, Thread.currentThread().getContextClassLoader(), Amber.class);
+        Thread.currentThread().setContextClassLoader(classLoader);
+        return classLoader;
     }
 
     /**
