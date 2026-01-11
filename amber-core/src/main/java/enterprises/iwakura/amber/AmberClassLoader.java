@@ -12,6 +12,10 @@ import java.util.List;
  */
 public class AmberClassLoader extends URLClassLoader {
 
+    static {
+        ClassLoader.registerAsParallelCapable();
+    }
+
     /**
      * Constructs a new AmberClassLoader with the specified dependencies, parent class loader, and caller class.
      *
