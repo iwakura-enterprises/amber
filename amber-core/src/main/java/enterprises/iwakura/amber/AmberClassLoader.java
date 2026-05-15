@@ -55,18 +55,15 @@ public class AmberClassLoader extends URLClassLoader {
             Class<?> clazz = findLoadedClass(name);
             if (clazz == null) {
                 try {
-                    // Current class loader contains the jar file
-                    // of the application, so we should be able
-                    // to find all classes within this class loader,
-                    // regardless if they are from dependencies or not.
-                    clazz = findClass(name);
-                } catch (ClassNotFoundException e) {
                     ClassLoader parent = getParent();
                     if (parent != null) {
                         clazz = parent.loadClass(name);
                     } else {
                         clazz = getSystemClassLoader().loadClass(name);
                     }
+                } catch (ClassNotFoundException e) {
+                    // Parent couldn't find it, try this loader's URLs (dependencies)
+                    clazz = findClass(name);
                 }
             }
             if (resolve) {
