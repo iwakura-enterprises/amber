@@ -54,16 +54,15 @@ public class AmberClassLoader extends URLClassLoader {
         synchronized (getClassLoadingLock(name)) {
             Class<?> clazz = findLoadedClass(name);
             if (clazz == null) {
-                try {
-                    ClassLoader parent = getParent();
-                    if (parent != null) {
-                        clazz = parent.loadClass(name);
-                    } else {
-                        clazz = getSystemClassLoader().loadClass(name);
+                // Only delegate java.* and javax.* to parent first
+                if (name.startsWith("java.") || name.startsWith("javax.") || name.startsWith("sun.") || name.startsWith("jdk.")) {
+                    clazz = getParent().loadClass(name);
+                } else {
+                    try {
+                        clazz = findClass(name); // try own URLs first
+                    } catch (ClassNotFoundException e) {
+                        clazz = getParent().loadClass(name); // fallback to parent
                     }
-                } catch (ClassNotFoundException e) {
-                    // Parent couldn't find it, try this loader's URLs (dependencies)
-                    clazz = findClass(name);
                 }
             }
             if (resolve) {
