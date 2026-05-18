@@ -208,7 +208,7 @@ public class Amber {
      * @throws IOException if an I/O error occurs during processing
      */
     protected List<Path> processManifest(AmberManifest manifest, BootstrapOptions options) throws IOException {
-        List<Path> dependencyPaths = new ArrayList<>();
+        List<Path> dependencyPaths = Collections.synchronizedList(new ArrayList<>());
         ExecutorService executorService = Executors.newFixedThreadPool(options.getDownloaderThreadCount());
         AtomicReference<Exception> lastException = new AtomicReference<>();
 
