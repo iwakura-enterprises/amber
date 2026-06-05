@@ -39,10 +39,15 @@ public class AmberClassLoader extends URLClassLoader {
         URL[] urls = new URL[pathList.size() + 1];
         for (int i = 0; i < pathList.size(); i++) {
             Path path = pathList.get(i);
-            try {
-                urls[i] = path.toUri().toURL();
-            } catch (MalformedURLException e) {
-                throw new RuntimeException("Failed to convert path " + path + " into URL", e);
+            // FIXME: In rare cases there can be null path. Find why
+            if (path != null) {
+                try {
+                    urls[i] = path.toUri().toURL();
+                } catch (MalformedURLException e) {
+                    throw new RuntimeException("Failed to convert path " + path + " into URL", e);
+                }
+            } else {
+                System.err.println("Null path passed into AmberClassLoader");
             }
         }
         urls[pathList.size()] = caller.getProtectionDomain().getCodeSource().getLocation();
